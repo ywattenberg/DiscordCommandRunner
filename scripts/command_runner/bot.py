@@ -143,8 +143,24 @@ class CommandRunnerBot(discord.Client):
         @self.tree.command(name="kill", description="Kill a Claude tmux session")
         @app_commands.describe(session_name="Session to kill (autocomplete)")
         async def kill_cmd(interaction: discord.Interaction, session_name: str) -> None:
+            # Read thread ID before killing (cleanup deletes the config)
+            thread_id = sessions.get_session_thread_id(session_name)
+
             success = sessions.kill_session(session_name)
             if success:
+                # Delete the associated Discord thread
+                if thread_id:
+                    try:
+                        thread = self.get_channel(thread_id)
+                        if thread is None:
+                            thread = await self.fetch_channel(thread_id)
+                        if isinstance(thread, discord.Thread):
+                            await thread.delete()
+                    except discord.NotFound:
+                        log.warning("Thread %s already deleted", thread_id)
+                    except discord.HTTPException as exc:
+                        log.warning("Failed to delete thread %s: %s", thread_id, exc)
+
                 await interaction.response.send_message(
                     f"Session `{session_name}` killed and cleaned up.",
                     ephemeral=True,

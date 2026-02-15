@@ -176,6 +176,21 @@ def list_sessions() -> list[dict[str, str]]:
     return sessions
 
 
+def get_session_thread_id(name: str) -> int | None:
+    """Read the Discord thread/channel ID from a session's config file."""
+    config_path = SESSIONS_DIR / name / "config.md"
+    if not config_path.is_file():
+        return None
+    try:
+        for line in config_path.read_text().splitlines():
+            line = line.strip()
+            if line.startswith("channel_id:"):
+                return int(line.split(":", 1)[1].strip())
+    except (ValueError, OSError):
+        pass
+    return None
+
+
 def kill_session(name: str) -> bool:
     """Kill a tmux session and clean up its temp directory."""
     result = subprocess.run(
