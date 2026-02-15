@@ -62,29 +62,35 @@ def spawn_session(
 
         ## Rules
 
-        1. **Every message goes through Discord.** Use `discord-notify --wait` for all communication: asking questions, reporting progress, sharing results, requesting clarification, or checking in. **Never ask the user anything in the terminal — all questions, confirmations, and prompts MUST be sent via Discord.** Do not use the AskUserQuestion tool or any other terminal-based interaction method.
+        1. **Every message goes through Discord.** Use `discord-notify` for all communication: asking questions, reporting progress, sharing results, requesting clarification, or checking in. **Never ask the user anything in the terminal — all questions, confirmations, and prompts MUST be sent via Discord.** Do not use the AskUserQuestion tool or any other terminal-based interaction method.
 
-        2. **Minimize terminal output.** Only print brief mechanical status lines like `Sending to Discord...` or `Received reply from user.` Do not duplicate message content or questions in the terminal.
+        2. **Use `--wait` only when you need user input** (asking a question, requesting confirmation, waiting for instructions). Do NOT use `--wait` for one-way status updates or progress reports — just send the message and continue working.
 
-        3. **Always use `--wait`** since this is interactive mode — every message expects a reply.
+        3. **When using `--wait`, set `--timeout 86400`** (4 hours) so the user has plenty of time to respond. Always set Bash tool timeout to `600000` (maximum) for any discord-notify call that uses `--wait`.
 
-        4. **Always set timeouts high:**
-           - Bash tool timeout: `600000` (maximum)
-           - Bot `--timeout 86400` (1 day) so the user has plenty of time to respond
+        4. **Minimize terminal output.** Only print brief mechanical status lines like `Sending to Discord...` or `Received reply from user.` Do not duplicate message content or questions in the terminal.
 
         5. **Parse replies and act on them.** When the user replies on Discord, treat their response exactly as if they typed it in the terminal. Continue working based on their instructions.
 
         6. **Exit conditions.** If the user replies with "exit", "stop", or "done" (case-insensitive), end the session. Confirm on Discord that the session has ended, then exit.
 
-        ## Command Template
+        ## Command Templates
 
-        For ALL discord-notify calls, you MUST use this exact config path:
+        For ALL discord-notify calls, you MUST use this exact config path.
 
+        **When you need user input (questions, confirmations):**
         ```bash
         uv run --project ${{CLAUDE_PLUGIN_ROOT}} discord-notify \\
           --message "<your message here>" \\
           --wait \\
           --timeout 86400 \\
+          --config "{config_abs}"
+        ```
+
+        **When sending a one-way update (progress, status, results):**
+        ```bash
+        uv run --project ${{CLAUDE_PLUGIN_ROOT}} discord-notify \\
+          --message "<your message here>" \\
           --config "{config_abs}"
         ```
 
@@ -111,13 +117,15 @@ def spawn_session(
     prompt_path.write_text(prompt_text)
 
     # 5. Spawn tmux session
-    #    Unset CLAUDECODE to avoid "nested session" detection when spawned from a Claude context
+    #    - Unset CLAUDECODE to avoid "nested session" detection
+    #    - Set CLAUDE_PLUGIN_ROOT so discord-notify commands work inside the session
     subprocess.run(
         [
             TMUX, "new-session", "-d",
             "-s", session_name,
             "-c", working_dir,
-            f"env -u CLAUDECODE {CLAUDE} --dangerously-skip-permissions --plugin-dir {plugin_dir}",
+            f"env -u CLAUDECODE CLAUDE_PLUGIN_ROOT={plugin_dir} {CLAUDE}"
+            f" --dangerously-skip-permissions --plugin-dir {plugin_dir}",
         ],
         check=True,
     )
@@ -133,8 +141,10 @@ def spawn_session(
         [TMUX, "paste-buffer", "-b", "prompt", "-t", session_name],
         check=True,
     )
+    # paste-buffer inserts text but doesn't submit — send Enter key to submit the prompt
+    time.sleep(1)
     subprocess.run(
-        [TMUX, "send-keys", "-t", session_name, "Enter"],
+        [TMUX, "send-keys", "-t", session_name, "", "Enter"],
         check=True,
     )
 
