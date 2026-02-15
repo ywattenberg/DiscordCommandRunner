@@ -1,0 +1,5 @@
+bot_token: "your-bot-token-here"
+command_channel_id: 1234567890
+guild_id: 1234567890        # optional — for fast slash command sync
+plugin_dir: /home/dev/projects/DiscordSkill
+default_working_dir: /home/dev/projects
