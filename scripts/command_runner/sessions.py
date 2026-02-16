@@ -124,8 +124,9 @@ def spawn_session(
             TMUX, "new-session", "-d",
             "-s", session_name,
             "-c", working_dir,
-            f"env -u CLAUDECODE CLAUDE_PLUGIN_ROOT={plugin_dir} {CLAUDE}"
-            f" --dangerously-skip-permissions --plugin-dir {plugin_dir}",
+            f"env -u CLAUDECODE CLAUDE_PLUGIN_ROOT={plugin_dir}"
+            f" SESSION_CONFIG={config_path.resolve()}"
+            f" {CLAUDE} --dangerously-skip-permissions --plugin-dir {plugin_dir}",
         ],
         check=True,
     )
